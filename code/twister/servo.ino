@@ -69,4 +69,27 @@ void updateServo() {
 }
 
 
+void updateServo2() {
+
+  // settings for rotation speed
+  const int fwdspeed = 1000;
+  const int stopped = 1500;
+  const int revspeed = 2000;
+
+  // set rotation status
+  if (!twister.isTurning) {
+    myservo.writeMicroseconds(stopped);
+  } 
+  else {
+    if (twister.isTurningFWD) {
+      myservo.writeMicroseconds(fwdspeed);
+    } 
+    else {
+      myservo.writeMicroseconds(revspeed);
+    }
+  }
+
+  
+}
+
 

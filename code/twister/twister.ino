@@ -1,4 +1,4 @@
- //    Tetrode Twister Control Software
+//    Tetrode Twister Control Software
 //    Copyright (C) 2011 Josh Siegle
 //
 //    This program is free software: you can redistribute it and/or modify
@@ -48,6 +48,7 @@ boolean printState = false;
 
 boolean saveState = false;
 
+boolean manualMode = false;
 // -------------------------------------------------------------------- //
 
 // BEGIN ACTUAL CODE:
@@ -75,6 +76,12 @@ Photocells photocells(2, 3);
 // EEPROM variables
 int remainingTurns;
 int turnDirection;
+
+
+unsigned long previousMillis = 0;        // will store last time Millis was updated
+unsigned long currentMillis = 0;  
+const int fwdTurnMS = 0.95e3;     // specify duration for forward turn in ms
+const int revTurnMS = 0.95e3;     // specify duration for reverse turn in ms  
 
 void setup()
 {
@@ -105,23 +112,59 @@ void setup()
   //  resumeDialog();  //Display the interactive dialog
   //}
 
+  manualMode = false;
+
 }
 
 void loop()
 {
-  inputs.check(twister.isTurning, verPCB);
+  if (!manualMode) {
+    inputs.check(twister.isTurning, verPCB);
+  } else {
+    inputs.check(twister.isTurning, verPCB);
+    // how many turns to do if in manual mode
+    inputs.fwdTurns = 90;
+    inputs.revTurns = 15;
+  }
+  
+
+  if (inputs.fwdTurns > 0) {
+    twister.isTurningFWD = true;  // true means go forwards
+  } else {
+    twister.isTurningFWD = false; // false means go backwards
+  }
+
+  updateServo2(); // goes forwards/backwards/stopped 
+
+  if ( (inputs.fwdTurns+inputs.revTurns) == 0 ){
+    twister.isTurning = false;  // false means stopped
+  }
 
   if (twister.isTurning) { // only update photocells if twister is spinning
-    int turns = photocells.update(twister.isTurningFWD,millis());
+    currentMillis = millis();
 
-    if (turns) {
-      twister.totalTurns += turns;
-      twister.isUpdated = true; // necessary to update LCD
-
-      if (printState) {
-        printVariables();
+    if (twister.isTurningFWD) {
+       if (currentMillis - previousMillis >= fwdTurnMS) {
+        // save the last time you counted a full turn
+        previousMillis = currentMillis;
+        inputs.fwdTurns = inputs.fwdTurns -1;
+        twister.totalTurns = twister.totalTurns +1;
+      }
+    } 
+    else {
+      if (currentMillis - previousMillis >= revTurnMS) {
+        // save the last time you counted a full turn
+        previousMillis = currentMillis;
+        inputs.revTurns = inputs.revTurns -1;
+        twister.totalTurns = twister.totalTurns +1;
       }
     }
+
+    if (printState) {
+      printVariables();
+    }
+
+    twister.isUpdated = true;
   }
 
   showTurns(); // update LCD screen
@@ -129,10 +172,10 @@ void loop()
   if (inputs.buttonState == LOW) { // check for button press
     twister.respondToButton();
     delay(250);
+    previousMillis = millis();
   }
 
-  updateServo();
-  
+
   if (saveState) {
     updateEEPROM();
   }
